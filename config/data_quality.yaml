@@ -1,0 +1,131 @@
+validation:
+  customers:
+    primary_key:
+      column: customer_id
+      unique: true
+      nullable: false
+
+    required_columns:
+      customer_unique_id:
+        nullable: false
+
+      customer_zip_code_prefix:
+        nullable: false
+
+    numeric_ranges:
+      customer_zip_code_prefix:
+        min: 0
+        max: 99999
+
+
+  orders:
+    primary_key:
+      column: order_id
+      unique: true
+      nullable: false
+
+    foreign_keys:
+      customer_id:
+        reference_table: customers
+        reference_column: customer_id
+
+    required_columns:
+      order_status:
+        nullable: false
+
+    allowed_values:
+      order_status:
+        values:
+          - delivered
+          - shipped
+          - canceled
+          - unavailable
+          - invoiced
+          - processing
+          - created
+          - approved
+
+    date_columns:
+      - order_purchase_timestamp
+      - order_approved_at
+      - order_delivered_carrier_date
+      - order_delivered_customer_date
+      - order_estimated_delivery_date
+
+
+  order_items:
+    foreign_keys:
+      order_id:
+        reference_table: orders
+        reference_column: order_id
+
+      product_id:
+        reference_table: products
+        reference_column: product_id
+
+      seller_id:
+        reference_table: sellers
+        reference_column: seller_id
+
+    numeric_ranges:
+      price:
+        min: 0
+
+      freight_value:
+        min: 0
+
+
+  order_payments:
+    foreign_keys:
+      order_id:
+        reference_table: orders
+        reference_column: order_id
+
+    allowed_values:
+      payment_type:
+        values:
+          credit_card
+          boleto
+          voucher
+          debit_card
+          unknown
+
+    numeric_ranges:
+      payment_value:
+        min: 0
+
+      payment_installments:
+        min: 0
+
+
+  order_reviews:
+    foreign_keys:
+      order_id:
+        reference_table: orders
+        reference_column: order_id
+
+    numeric_ranges:
+      review_score:
+        min: 1
+        max: 5
+
+
+  products:
+    primary_key:
+      column: product_id
+      unique: true
+      nullable: false
+
+
+  sellers:
+    primary_key:
+      column: seller_id
+      unique: true
+      nullable: false
+
+
+  geolocation:
+    numeric_ranges:
+      geolocation_zip_code_prefix:
+        min: 0
+        max: 99999
