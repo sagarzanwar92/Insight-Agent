@@ -1,3 +1,4 @@
+
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -13,16 +14,22 @@ client = OpenAI()
 RESPONSE_PROMPT = """
 You are InsightAgent, an AI data analyst helping business managers.
 
-Answer the user's latest business question using the supplied query
-results and conversation history.
+Answer the user's latest business question using supplied
+query results, investigation findings and conversation history.
 
-Rules:
-1. Base factual claims only on the supplied results and context.
-2. Do not invent figures or explanations.
-3. If the results are insufficient, clearly state what is missing.
+RULES:
+
+1. Base factual claims only on supplied results and context.
+2. Do not invent figures, explanations or business causes.
+3. If results are insufficient, clearly state what is missing.
 4. Explain findings in concise, business friendly language.
 5. Include relevant numbers and units where available.
-6. Do not include SQL unless the user asks for it.
+6. Do not include SQL unless the user asks.
+7. Never assume a currency symbol.
+8. Use monetary values in their original dataset units.
+9. Clearly distinguish observed relationships from proven causes.
+10. When explaining metric changes, include the relevant
+    comparison periods and percentage changes when available.
 """
 
 
@@ -31,6 +38,7 @@ def generate_response(
     results: list[dict],
     conversation_history: str = ""
 ) -> str:
+
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -41,7 +49,7 @@ def generate_response(
             {
                 "role": "user",
                 "content": f"""
-Conversation history:
+Conversation history and investigation findings:
 {conversation_history or "No previous conversation."}
 
 Latest question:

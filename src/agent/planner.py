@@ -1,3 +1,4 @@
+
 from pathlib import Path
 import json
 
@@ -14,43 +15,60 @@ client = OpenAI()
 PLANNER_PROMPT = """
 You are the planning component of InsightAgent, an AI Data Analyst.
 
-Your job is to understand the latest user question, consider the
-conversation history, and determine which actions are required.
+Understand the user's latest question, consider the conversation
+history, and determine the actions required.
 
-Available actions:
+AVAILABLE ACTIONS:
 
 1. query_database
 Retrieve factual information from the database.
 
 2. analyze_data
-Perform calculations, comparisons, trend analysis, decomposition,
-or interpret retrieved data.
+Interpret retrieved evidence, identify patterns, evaluate
+hypotheses and determine whether further investigation is needed.
 
 3. create_visualization
 Create a chart when explicitly requested or materially useful.
 
 4. answer_from_memory
-Answer questions about previous questions, answers, or findings
+Answer questions about previous questions, answers or findings
 using conversation history without querying the database.
 
-Decision rules:
+DECISION RULES:
 
 1. Use answer_from_memory when the question can be answered
    entirely from conversation history.
 
-2. Use query_database when fresh factual data is required.
+2. Use query_database when fresh factual information is required.
 
-3. Use analyze_data when calculations, comparisons, trends,
-   or diagnostic explanations are required.
+3. Use analyze_data when interpretation, comparisons, trends,
+   diagnostic reasoning or recommendations are required.
 
 4. Use create_visualization when a chart is requested or useful.
 
-5. A follow up question must inherit relevant context from
+5. Diagnostic questions generally require both query_database
+   and analyze_data.
+
+6. Analytical questions generally require both query_database
+   and analyze_data.
+
+7. Simple descriptive questions may require only query_database.
+
+8. Follow up questions must inherit relevant context from
    previous conversation messages.
 
-6. Do not add unnecessary actions.
+9. A follow up question may introduce a new dimension,
+   geography, category or metric while retaining relevant
+   context from the earlier discussion.
 
-Return ONLY valid JSON using this structure:
+10. Do not add unnecessary actions.
+
+IMPORTANT:
+The Analysis Agent will independently decide whether additional
+investigation is required after reviewing database evidence.
+Do not attempt to predict all investigation queries in advance.
+
+RETURN ONLY VALID JSON:
 
 {
     "question_type": "descriptive",
@@ -72,15 +90,18 @@ Do not include additional text.
 """
 
 
-def create_plan(question: str, conversation_history: str = "") -> dict:
+def create_plan(
+    question: str,
+    conversation_history: str = ""
+) -> dict:
 
     planning_input = f"""
-        Previous conversation:
-        {conversation_history or "No previous conversation."}
+Previous conversation:
+{conversation_history or "No previous conversation."}
 
-        Latest user question:
-        {question}
-        """
+Latest user question:
+{question}
+"""
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -99,6 +120,6 @@ def create_plan(question: str, conversation_history: str = "") -> dict:
         }
     )
 
-    plan = json.loads(response.choices[0].message.content)
-
-    return plan
+    return json.loads(
+        response.choices[0].message.content
+    )

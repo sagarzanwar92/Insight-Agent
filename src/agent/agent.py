@@ -1,10 +1,15 @@
+
 from src.agent.planner import create_plan
 from src.agent.sql_agent import generate_sql
+from src.agent.analysis_agent import analyze_data
 from src.agent.response_agent import generate_response
 from src.tools.database_tools import query_database
 from src.conversation.manager import ConversationManager
 
+
 conversation_manager = ConversationManager()
+
+MAX_INVESTIGATION_ROUNDS = 4
 
 
 def run_agent(conversation_id: str, user_message: str):
@@ -22,7 +27,7 @@ def run_agent(conversation_id: str, user_message: str):
         "content": user_message
     })
 
-    # Generate execution plan using the latest question and history.
+    # Generate the initial execution plan.
     plan = create_plan(
         question=user_message,
         conversation_history=history
@@ -32,46 +37,161 @@ def run_agent(conversation_id: str, user_message: str):
     print(plan)
 
     steps = plan.get("steps", [])
-    results = []
 
-    # Execute actions according to the planner's decisions.
+    all_results = []
+    all_findings = []
+    investigation_log = []
+
+    # --------------------------------------------------
+    # STEP 1: DATABASE RETRIEVAL AND ITERATIVE ANALYSIS
+    # --------------------------------------------------
 
     if "query_database" in steps:
 
-        sql = generate_sql(
-            question=user_message,
-            conversation_history=history
-        )
+        current_question = user_message
 
-        print("\nGENERATED SQL")
-        print(sql)
+        if "analyze_data" in steps:
 
-        results = query_database(sql)
+            for round_number in range(1, MAX_INVESTIGATION_ROUNDS + 1):
 
-        print("\nQUERY RESULTS")
-        print(results)
+                print(
+                    f"\nINVESTIGATION ROUND {round_number}"
+                )
 
-    if "analyze_data" in steps:
-        print("\nANALYSIS")
-        print("Analysis has been requested by the planner.")
-        # Analysis tool will be connected in the next milestone.
+                # Generate SQL for the current investigation.
+                sql = generate_sql(
+                    question=current_question,
+                    conversation_history=history
+                )
+
+                print("\nGENERATED SQL")
+                print(sql)
+
+                # Execute the database query.
+                results = query_database(sql)
+
+                print("\nQUERY RESULTS")
+                print(results)
+
+                all_results.extend(results)
+
+                investigation_log.append({
+                    "question": current_question,
+                    "sql": sql,
+                    "results": results
+                })
+
+                # Build context from previous investigations.
+                previous_context = (
+                    history
+                    + "\nInvestigation history:\n"
+                    + str(investigation_log)
+                )
+
+                # Ask the Analysis Agent to evaluate the evidence.
+                analysis = analyze_data(
+                    question=user_message,
+                    query_results=results,
+                    conversation_history=previous_context,
+                    previous_findings=all_findings
+                )
+
+                print("\nANALYSIS")
+                print(analysis)
+
+                # Preserve findings across investigation rounds.
+                new_findings = analysis.get("findings", [])
+                all_findings.extend(new_findings)
+
+                # Stop when sufficient evidence is available.
+                if (
+                    analysis.get("assessment") == "sufficient"
+                    or not analysis.get("investigation_needed", False)
+                ):
+                    print("\nSUFFICIENT EVIDENCE FOUND")
+                    break
+
+                # Identify the next investigation.
+                next_question = analysis.get("next_question")
+
+                if not next_question:
+                    print("\nNO FURTHER INVESTIGATION QUESTION")
+                    break
+
+                current_question = next_question
+
+            else:
+                print(
+                    "\nMAXIMUM INVESTIGATION ROUNDS REACHED"
+                )
+
+        else:
+
+            # Simple descriptive questions need only one query.
+            sql = generate_sql(
+                question=user_message,
+                conversation_history=history
+            )
+
+            print("\nGENERATED SQL")
+            print(sql)
+
+            results = query_database(sql)
+
+            print("\nQUERY RESULTS")
+            print(results)
+
+            all_results.extend(results)
+
+            investigation_log.append({
+                "question": user_message,
+                "sql": sql,
+                "results": results
+            })
+
+    # --------------------------------------------------
+    # STEP 2: VISUALIZATION PLACEHOLDER
+    # --------------------------------------------------
 
     if "create_visualization" in steps:
-        print("\nVISUALIZATION")
-        print("Visualization has been requested by the planner.")
-        # Visualization tool will be connected in a later milestone.
 
-    # Generate the final business response.
+        print("\nVISUALIZATION")
+        print(
+            "Visualization will be implemented in a later milestone."
+        )
+
+    # --------------------------------------------------
+    # STEP 3: PREPARE EVIDENCE FOR RESPONSE GENERATION
+    # --------------------------------------------------
+
+    response_context = history
+
+    if investigation_log:
+        response_context += (
+            "\nInvestigation history:\n"
+            + str(investigation_log)
+        )
+
+    if all_findings:
+        response_context += (
+            "\nConsolidated findings:\n"
+            + str(all_findings)
+        )
+
+    # --------------------------------------------------
+    # STEP 4: GENERATE FINAL BUSINESS RESPONSE
+    # --------------------------------------------------
+
     answer = generate_response(
         question=user_message,
-        results=results,
-        conversation_history=history
+        results=all_results,
+        conversation_history=response_context
     )
 
     print("\nINSIGHTAGENT ANSWER")
     print(answer)
 
-    # Store the answer for future follow up questions.
+    # Save the final answer for future follow up questions.
     state.messages.append({
         "role": "assistant",
         "content": answer

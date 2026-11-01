@@ -4,24 +4,25 @@ from src.agent.analysis_agent import analyze_data
 
 results = [
     {
-        "year": 2018,
-        "month": 7,
-        "month_name": "July",
-        "total_revenue": 1058728.03
+        "month": "July",
+        "revenue": 1058728.03
     },
     {
-        "year": 2018,
-        "month": 8,
-        "month_name": "August",
-        "total_revenue": 1003308.47
+        "month": "August",
+        "revenue": 1003308.47
     }
 ]
 
 
-analysis = analyze_data(
-    question="Analyze the revenue change between July and August 2018.",
+result = analyze_data(
+    question="Why did revenue decline between July and August 2018?",
     query_results=results
 )
 
-print("\nANALYSIS RESULTS")
-print(analysis)
+
+print("\nSTRUCTURED ANALYSIS")
+print(result)
+
+print("\nASSESSMENT:", result["assessment"])
+print("INVESTIGATION NEEDED:", result["investigation_needed"])
+print("NEXT QUESTION:", result["next_question"])
