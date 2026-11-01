@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -11,43 +12,76 @@ client = OpenAI()
 
 
 PLANNER_PROMPT = """
-You are the planning component of an AI Data Analyst.
+You are the planning component of InsightAgent, an AI Data Analyst.
 
-Your job is to understand a user's business question and determine
-what actions are required to answer it.
+Your job is to understand the latest user question, consider the
+conversation history, and determine which actions are required.
 
 Available actions:
 
-query_database
-Use when factual information must be retrieved from the database.
+1. query_database
+Retrieve factual information from the database.
 
-analyze_data
-Use when retrieved data needs comparison, calculation, trend analysis,
-decomposition, or explanation.
+2. analyze_data
+Perform calculations, comparisons, trend analysis, decomposition,
+or interpret retrieved data.
 
-create_visualization
-Use when the user explicitly asks for a chart or when visualization
-would materially improve understanding.
+3. create_visualization
+Create a chart when explicitly requested or materially useful.
+
+4. answer_from_memory
+Answer questions about previous questions, answers, or findings
+using conversation history without querying the database.
+
+Decision rules:
+
+1. Use answer_from_memory when the question can be answered
+   entirely from conversation history.
+
+2. Use query_database when fresh factual data is required.
+
+3. Use analyze_data when calculations, comparisons, trends,
+   or diagnostic explanations are required.
+
+4. Use create_visualization when a chart is requested or useful.
+
+5. A follow up question must inherit relevant context from
+   previous conversation messages.
+
+6. Do not add unnecessary actions.
 
 Return ONLY valid JSON using this structure:
 
 {
-    "question_type": "descriptive | diagnostic | analytical",
+    "question_type": "descriptive",
     "requires_database": true,
-    "requires_analysis": true,
-    "requires_visualization": true,
-    "steps": [
-        "query_database",
-        "analyze_data",
-        "create_visualization"
-    ]
+    "requires_analysis": false,
+    "requires_visualization": false,
+    "steps": ["query_database"]
 }
 
-Do not answer the user's business question.
-Do not include any additional text.
+Allowed question_type values:
+descriptive, diagnostic, analytical, conversational
+
+Allowed steps:
+answer_from_memory, query_database, analyze_data,
+create_visualization
+
+Do not answer the business question.
+Do not include additional text.
 """
 
-def create_plan(question: str):
+
+def create_plan(question: str, conversation_history: str = "") -> dict:
+
+    planning_input = f"""
+        Previous conversation:
+        {conversation_history or "No previous conversation."}
+
+        Latest user question:
+        {question}
+        """
+
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -57,7 +91,7 @@ def create_plan(question: str):
             },
             {
                 "role": "user",
-                "content": question
+                "content": planning_input
             }
         ],
         response_format={
@@ -65,4 +99,6 @@ def create_plan(question: str):
         }
     )
 
-    return response.choices[0].message.content
+    plan = json.loads(response.choices[0].message.content)
+
+    return plan
